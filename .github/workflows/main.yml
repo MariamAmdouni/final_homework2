@@ -7,7 +7,7 @@ on:
 
 jobs:
   train-cnn:
-    runs-on: ubuntu-22.04  # Lock to a stable Ubuntu version
+    runs-on: ubuntu-latest  # Lock to a stable Ubuntu version
     
     steps:
       - name: Checkout Repository
