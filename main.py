@@ -10,7 +10,7 @@ on:
 
 jobs:
   train-cnn:
-    runs-on: ubuntu-22.04  # Lock to Ubuntu 22.04
+    runs-on:ubuntu-latest
     
     steps:
       - name: Checkout Repository
