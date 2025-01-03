@@ -4,13 +4,10 @@ on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
 
 jobs:
   train-cnn:
-    runs-on: ubuntu-22.04  # Lock to Ubuntu 22.04
+    runs-on: ubuntu-22.04  # Lock to a stable Ubuntu version
     
     steps:
       - name: Checkout Repository
@@ -19,7 +16,7 @@ jobs:
       - name: Set Up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.9'  # Use valid Python version
+          python-version: '3.11'  # Use valid Python version
 
       - name: Install Dependencies
         run: |
