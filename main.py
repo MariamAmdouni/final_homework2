@@ -1,6 +1,7 @@
 import argparse
 import logging
 import os
+import mlflow
 import warnings
 
 warnings.filterwarnings('ignore')
@@ -30,6 +31,9 @@ def main(args):
     model = Classifier(len(CLASS_NAMES), backbone=BACKBONE, freeze_backbone=FREEZE_BACKBONE)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
+    
+    #Mlflow URI from environment variables
+    mlflow.set_tracking_uri(os.getenv("SECRET_HOST"))
 
     if args.mode == "train":
         # Load the entire dataset
