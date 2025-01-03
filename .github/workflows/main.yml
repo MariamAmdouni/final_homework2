@@ -1,21 +1,17 @@
-name: CI Workflow
+name: CNN Pipeline
 
-on:
+on: 
   push:
-    branches:
-      - main
+    branches: 
+      - master
   pull_request:
-    branches:
-      - main
+    branches: 
+      - master
 
 jobs:
-  build:
+  build-and-train:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
-      id-token: write
-      
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -23,24 +19,27 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.8'
+          python-version: 3.10
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-
-      - name: Create credentials.json
-        run: echo "${{ secrets.GDRIVE_CREDENTIALS_DATA }}" > credentials.json
-
-      - name: Set up DVC remote
+          
+      # DVC Setup and Data Pull
+      - name: Set up DVC and pull data
+        env:
+          GDRIVE_CREDENTIALS_DATA: ${{ secrets.GDRIVE_CREDENTIALS_DATA }}
         run: |
+          echo "${{ secrets.GDRIVE_CREDENTIALS_DATA }}" > credentials.json
           dvc remote modify --local gdrive-remote gdrive_service_account_json_file_path credentials.json
+          dvc pull -v
 
-      - name: Pull data using DVC
-        run: dvc pull -v
-
-      - name: Run Tests
+      # Train or Test Model
+      - name: Train Model
         run: |
-          python3 main.py --mode test --data_path ./data/test/ --model_path ./models/model.pth
+          python main.py --mode train --data_path ./data/train/
 
+      - name: Test Model
+        run: |
+          python main.py --mode test --data_path ./data/test/ --model_path ./models/checkpoint.pth
