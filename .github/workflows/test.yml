@@ -55,7 +55,27 @@ jobs:
           uv run dvc pull -v
 
       # Run CNN Ship Filter Inference
-      - name: Run tests
+      - name: Set up MLflow tracking URI
+        env:
+          MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+        run: |
+          echo "MLFLOW_TRACKING_URI=${{ secrets.MLFLOW_TRACKING_URI }}"
+
+      - name: Run Training with MLflow Experiment Logging
         run: |
           mkdir -p /home/runner/work/classification-pytorch/classification-pytorch/plots
-          python3 main.py --mode test --data_path ./data/test/ --model_path ./models/cnn_resnet18_freeze_backbone_False.pth
+          python3 src/train.py --epochs 20 --batch_size 8 --learning_rate 0.001 --model_dir ./models --plot_dir ./plots --backbone resnet18 --freeze_backbone True
+          python3 src/train.py --epochs 20 --batch_size 16 --learning_rate 0.001 --model_dir ./models --plot_dir ./plots --backbone resnet18 --freeze_backbone True
+          python3 src/train.py --epochs 25 --batch_size 16 --learning_rate 0.001 --model_dir ./models --plot_dir ./plots --backbone resnet18 --freeze_backbone True
+
+      - name: Upload the MLflow experiment results
+        uses: actions/upload-artifact@v2
+        with:
+          name: mlflow-experiment-results
+          path: ./mlruns  # Adjust path as needed to where MLflow logs are stored
+
+      - name: Run Inference (Test) on Best Model
+        run: |
+          mkdir -p /home/runner/work/classification-pytorch/classification-pytorch/plots
+          python3 src/main.py --mode test --data_path ./data/test/ --model_path ./models/cnn_resnet18_freeze_backbone_True.pth
+      
