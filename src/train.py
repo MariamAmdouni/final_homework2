@@ -1,3 +1,4 @@
+import argparse
 import logging
 import os
 
@@ -8,6 +9,18 @@ import mlflow
 import mlflow.pytorch
 
 from .utils import plot_loss_curves
+
+# Add argument parsing
+def parse_args():
+    parser = argparse.ArgumentParser(description="Train a CNN model for classification")
+    parser.add_argument('--epochs', type=int, default=20, help='Number of epochs to train the model')
+    parser.add_argument('--batch_size', type=int, default=8, help='Batch size for training')
+    parser.add_argument('--learning_rate', type=float, default=0.001, help='Learning rate for the optimizer')
+    parser.add_argument('--model_dir', type=str, default='./models', help='Directory to save the trained model')
+    parser.add_argument('--plot_dir', type=str, default='./plots', help='Directory to save training/validation loss plots')
+    parser.add_argument('--backbone', type=str, default='resnet18', help='Backbone model for the CNN')
+    parser.add_argument('--freeze_backbone', type=bool, default=True, help='Whether to freeze the backbone layers during training')
+    return parser.parse_args()
 
 def train_classifier_with_mlflow(model, train_loader, val_loader, criterion, optimizer, num_epochs, model_dir, plot_dir, device, backbone, freeze_backbone):
     """
@@ -48,7 +61,8 @@ def train_classifier_with_mlflow(model, train_loader, val_loader, criterion, opt
         mlflow.log_param("backbone", backbone)
         mlflow.log_param("freeze_backbone", freeze_backbone)
         mlflow.log_param("epochs", num_epochs)
-        
+        mlflow.log_param("batch_size", batch_size)
+
         # Ensure the model directory exists
         global filename
         best_val_loss = float('inf')
@@ -132,3 +146,17 @@ def train_classifier_with_mlflow(model, train_loader, val_loader, criterion, opt
         # Log plot artifact to MLflow
         mlflow.log_artifact(os.path.join(plot_dir, f"{filename}_loss_curves.png"))
 
+if __name__ == "__main__":
+    # Parse the arguments
+    args = parse_args()
+
+    # Example: You need to define the model, optimizer, dataloaders, etc., as per your setup.
+    model = YourModel()  # Example model
+    train_loader = get_train_loader(args.batch_size)  # Load the train data
+    val_loader = get_val_loader(args.batch_size)  # Load the validation data
+    criterion = torch.nn.CrossEntropyLoss()  # Define loss
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)  # Define optimizer
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # Start training
+    train_classifier_with_mlflow(model, train_loader, val_loader, criterion, optimizer, args.epochs, args.model_dir, args.plot_dir, device, args.backbone, args.freeze_backbone)
