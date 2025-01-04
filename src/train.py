@@ -8,7 +8,7 @@ from torch.optim.lr_scheduler import StepLR
 import mlflow
 import mlflow.pytorch
 
-from .utils import plot_loss_curves
+from utils import plot_loss_curves
 
 # Add argument parsing
 def parse_args():
