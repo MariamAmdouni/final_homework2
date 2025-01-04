@@ -78,4 +78,4 @@ jobs:
       - name: Run Inference (Test) on Best Model
         run: |
           mkdir -p /home/runner/work/classification-pytorch/classification-pytorch/plots
-          python3 src/main.py --mode test --data_path ./data/test/ --model_path ./models/cnn_resnet18_freeze_backbone_True.pth
+          python3 main.py --mode test --data_path ./data/test/ --model_path ./models/cnn_resnet18_freeze_backbone_True.pth
