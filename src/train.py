@@ -4,15 +4,14 @@ import os
 import torch
 from torch.cuda.amp import GradScaler, autocast
 from torch.optim.lr_scheduler import StepLR
+import mlflow
+import mlflow.pytorch
 
 from .utils import plot_loss_curves
 
-
-def train_classifier(model, train_loader, val_loader, criterion, optimizer, num_epochs, model_dir, plot_dir, device,
-                     backbone,
-                     freeze_backbone):
+def train_classifier_with_mlflow(model, train_loader, val_loader, criterion, optimizer, num_epochs, model_dir, plot_dir, device, backbone, freeze_backbone):
     """
-    Trains a CNN for classification
+    Trains a CNN for classification and logs the experiment with MLflow
 
     Parameters:
     -----------
@@ -43,77 +42,93 @@ def train_classifier(model, train_loader, val_loader, criterion, optimizer, num_
     --------
     None
     """
-    # Ensure the model directory exists
-    global filename
-    best_val_loss = float('inf')
-    counter = 0
-    patience = 10
-    train_losses = []
-    val_losses = []
-    scaler = GradScaler()
+    # Start the MLflow experiment
+    with mlflow.start_run():
+        # Log hyperparameters
+        mlflow.log_param("backbone", backbone)
+        mlflow.log_param("freeze_backbone", freeze_backbone)
+        mlflow.log_param("epochs", num_epochs)
+        
+        # Ensure the model directory exists
+        global filename
+        best_val_loss = float('inf')
+        counter = 0
+        patience = 10
+        train_losses = []
+        val_losses = []
+        scaler = GradScaler()
 
-    # Learning rate schedule
-    scheduler = StepLR(optimizer, step_size=20, gamma=0.1)
+        # Learning rate schedule
+        scheduler = StepLR(optimizer, step_size=20, gamma=0.1)
 
-    model.to(device)  # Move model to the device
+        model.to(device)  # Move model to the device
 
-    for epoch in range(num_epochs):
-        # Training phase
-        model.train()
-        total_train_loss = 0
+        for epoch in range(num_epochs):
+            # Training phase
+            model.train()
+            total_train_loss = 0
 
-        for images, labels in train_loader:
-            images, labels = images.to(device), labels.to(device)
-
-            optimizer.zero_grad()
-
-            # Forward pass and compute loss inside autocast
-            with autocast():
-                outputs = model(images)
-                loss = criterion(outputs, labels.long())
-
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
-
-            total_train_loss += loss.item()
-
-        # Update learning rate
-        scheduler.step()
-        average_train_loss = total_train_loss / len(train_loader)
-        train_losses.append(average_train_loss)
-
-        # Validation phase
-        model.eval()
-        total_val_loss = 0.0
-
-        with torch.no_grad():
-            for images, labels in val_loader:
+            for images, labels in train_loader:
                 images, labels = images.to(device), labels.to(device)
 
-                val_outputs = model(images)
-                val_loss = criterion(val_outputs, labels.long())
-                total_val_loss += val_loss.item()
+                optimizer.zero_grad()
 
-        average_val_loss = total_val_loss / len(val_loader)
-        val_losses.append(average_val_loss)
+                # Forward pass and compute loss inside autocast
+                with autocast():
+                    outputs = model(images)
+                    loss = criterion(outputs, labels.long())
 
-        logging.info(
-            f"Epoch [{epoch + 1}/{num_epochs}], Train Loss: {average_train_loss:.8f}, Validation Loss: {average_val_loss:.8f}")
+                scaler.scale(loss).backward()
+                scaler.step(optimizer)
+                scaler.update()
 
-        # Early stopping and model saving
-        if average_val_loss < best_val_loss:
-            logging.info(f'Validation loss decreased, saved the model at epoch {epoch + 1}')
-            best_val_loss = average_val_loss
-            counter = 0
-            # Save the best trained model
-            filename = f'cnn_{backbone}_freeze_backbone_{freeze_backbone}'
-            torch.save(model.state_dict(), os.path.join(model_dir, f"{filename}.pth"))
-        else:
-            counter += 1
-            if counter >= patience:
-                logging.info(f'Validation loss did not improve for the last {patience} epochs. Stopping early.')
-                break
+                total_train_loss += loss.item()
 
-    # Plot loss curves
-    plot_loss_curves(train_losses, val_losses, filename, plot_dir)
+            # Update learning rate
+            scheduler.step()
+            average_train_loss = total_train_loss / len(train_loader)
+            train_losses.append(average_train_loss)
+
+            # Validation phase
+            model.eval()
+            total_val_loss = 0.0
+
+            with torch.no_grad():
+                for images, labels in val_loader:
+                    images, labels = images.to(device), labels.to(device)
+
+                    val_outputs = model(images)
+                    val_loss = criterion(val_outputs, labels.long())
+                    total_val_loss += val_loss.item()
+
+            average_val_loss = total_val_loss / len(val_loader)
+            val_losses.append(average_val_loss)
+
+            logging.info(
+                f"Epoch [{epoch + 1}/{num_epochs}], Train Loss: {average_train_loss:.8f}, Validation Loss: {average_val_loss:.8f}")
+
+            # Log metrics to MLflow
+            mlflow.log_metric("train_loss", average_train_loss)
+            mlflow.log_metric("val_loss", average_val_loss)
+
+            # Early stopping and model saving
+            if average_val_loss < best_val_loss:
+                logging.info(f'Validation loss decreased, saved the model at epoch {epoch + 1}')
+                best_val_loss = average_val_loss
+                counter = 0
+                # Save the best trained model
+                filename = f'cnn_{backbone}_freeze_backbone_{freeze_backbone}'
+                torch.save(model.state_dict(), os.path.join(model_dir, f"{filename}.pth"))
+                # Log model artifact to MLflow
+                mlflow.pytorch.log_model(model, "model")
+            else:
+                counter += 1
+                if counter >= patience:
+                    logging.info(f'Validation loss did not improve for the last {patience} epochs. Stopping early.')
+                    break
+
+        # Plot loss curves
+        plot_loss_curves(train_losses, val_losses, filename, plot_dir)
+        # Log plot artifact to MLflow
+        mlflow.log_artifact(os.path.join(plot_dir, f"{filename}_loss_curves.png"))
+
